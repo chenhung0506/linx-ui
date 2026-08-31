@@ -1,0 +1,17 @@
+version: '3.9'
+services:
+  linx-ui:
+    container_name: linx-ui
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ghcr.io/chenhung0506/linx-ui:latest
+    ports:
+      - "3016:80"
+    restart: always
+    networks:
+      - nginx
+networks:
+  nginx:
+    external: true
+    name: nginx

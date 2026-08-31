@@ -1,0 +1,740 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>單字卡</title>
+<style>
+  :root {
+    --bg: #f3f4f6;
+    --card: #ffffff;
+    --ink: #1a2233;
+    --ink-soft: #667085;
+    --line: #dfe3e8;
+    --accent: #9a5b2c;
+    --accent-hover: #7e4a23;
+    --danger: #b3412f;
+    --danger-bg: #fbeae7;
+    --ok-bg: #f1f6ee;
+    --ok-line: #cddcc0;
+    --chip-bg: #f3ede6;
+    --back-bg: #fbf7f1;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    --sans: -apple-system, "Segoe UI", "PingFang TC", "Noto Sans TC", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #11161d;
+      --card: #1a212b;
+      --ink: #e6ebf1;
+      --ink-soft: #8b98a8;
+      --line: #2a3441;
+      --accent: #d99a5b;
+      --accent-hover: #e6ab72;
+      --danger: #e08b7a;
+      --danger-bg: #2c1c19;
+      --ok-bg: #17241b;
+      --ok-line: #33472f;
+      --chip-bg: #26303d;
+      --back-bg: #202832;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    padding: 24px 16px 80px;
+  }
+
+  .page { max-width: 880px; margin: 0 auto; }
+
+  header.top { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 8px; }
+  h1 { font-size: 22px; font-weight: 700; margin: 0; }
+  .sub { color: var(--ink-soft); font-size: 13px; margin: 4px 0 0; }
+  a.relogin { font-size: 12px; color: var(--ink-soft); text-decoration: none; }
+  a.relogin:hover { color: var(--accent); }
+
+  button {
+    font-family: var(--sans);
+    cursor: pointer;
+  }
+  .btn {
+    padding: 9px 16px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--card);
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: #fff; }
+  .btn.danger { color: var(--danger); }
+  .btn.danger:hover { border-color: var(--danger); color: var(--danger); }
+  .btn:disabled { opacity: 0.5; cursor: default; }
+  .btn.small { padding: 5px 10px; font-size: 12px; }
+
+  /* ---- Form panel ---- */
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 24px;
+    display: none;
+  }
+  .panel.open { display: block; }
+  .panel h2 { font-size: 15px; margin: 0 0 14px; }
+  label { display: block; font-size: 12px; font-weight: 600; color: var(--ink-soft); margin-bottom: 6px; }
+  .field { margin-bottom: 14px; }
+  input[type="text"], textarea {
+    width: 100%;
+    font-size: 14px;
+    padding: 9px 12px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--ink);
+    font-family: var(--sans);
+  }
+  textarea { resize: vertical; min-height: 44px; }
+  input:focus, textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
+  }
+
+  .front-row { position: relative; }
+  .lang-badge {
+    display: inline-block;
+    margin-top: 6px;
+    font-size: 11px;
+    color: var(--ink-soft);
+  }
+  .lang-badge b { color: var(--accent); }
+
+  .autocomplete-box {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    margin-top: 4px;
+    max-height: 160px;
+    overflow-y: auto;
+    z-index: 5;
+    display: none;
+  }
+  .autocomplete-box.open { display: block; }
+  .autocomplete-box div {
+    padding: 7px 12px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .autocomplete-box div:hover { background: var(--chip-bg); }
+
+  .translate-row { display: flex; gap: 8px; align-items: flex-start; }
+  .translate-row input { flex: 1; }
+
+  .candidates { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; }
+  .candidate {
+    padding: 6px 12px;
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    font-size: 13px;
+    background: var(--chip-bg);
+  }
+  .candidate.selected { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .candidate .match { font-size: 11px; color: var(--ink-soft); margin-left: 4px; }
+
+  .form-actions { display: flex; gap: 8px; margin-top: 16px; }
+
+  /* ---- Bulk create panel ---- */
+  .bulk-textareas {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .bulk-textareas textarea { min-height: 140px; font-family: var(--mono); font-size: 13px; }
+  @media (max-width: 560px) {
+    .bulk-textareas { grid-template-columns: 1fr; }
+  }
+  .bulk-results {
+    margin-top: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 220px;
+    overflow-y: auto;
+  }
+  .bulk-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 13px;
+    padding: 4px 8px;
+    border-radius: 4px;
+  }
+  .bulk-row .status { width: 16px; flex: none; }
+  .bulk-row.ok { color: inherit; }
+  .bulk-row.fail { background: var(--danger-bg); color: var(--danger); }
+  .bulk-row.pending { color: var(--ink-soft); }
+  .bulk-row .reason { color: var(--ink-soft); font-size: 12px; }
+
+  .msg {
+    margin-top: 12px;
+    padding: 9px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    display: none;
+  }
+  .msg.error { display: block; background: var(--danger-bg); color: var(--danger); }
+  .msg.ok { display: block; background: var(--ok-bg); color: inherit; border: 1px solid var(--ok-line); }
+
+  /* ---- Card grid ---- */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 14px;
+  }
+  .flip-card {
+    perspective: 1000px;
+    height: 150px;
+  }
+  .flip-card-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transition: transform 0.5s;
+    transform-style: preserve-3d;
+    cursor: pointer;
+  }
+  .flip-card.flipped .flip-card-inner { transform: rotateY(180deg); }
+  .face {
+    position: absolute;
+    inset: 0;
+    backface-visibility: hidden;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+  }
+  .face.front { background: var(--card); }
+  .face.back { background: var(--back-bg); transform: rotateY(180deg); }
+
+  .face-text {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: 600;
+    text-align: center;
+    word-break: break-word;
+  }
+  .face-meta { display: flex; justify-content: space-between; align-items: center; }
+  .lang-tag {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: var(--ink-soft);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 1px 6px;
+  }
+  .card-actions { display: flex; gap: 4px; }
+  .card-actions button {
+    border: none;
+    background: none;
+    color: var(--ink-soft);
+    font-size: 12px;
+    padding: 2px 4px;
+  }
+  .card-actions button:hover { color: var(--accent); }
+  .card-actions button.danger:hover { color: var(--danger); }
+
+  .verb-chips { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; justify-content: center; }
+  .verb-chip {
+    font-size: 10px;
+    background: var(--chip-bg);
+    border-radius: 4px;
+    padding: 2px 6px;
+    color: var(--ink-soft);
+  }
+
+  .empty {
+    text-align: center;
+    color: var(--ink-soft);
+    font-size: 13px;
+    padding: 60px 0;
+  }
+  .loading { text-align: center; color: var(--ink-soft); font-size: 13px; padding: 40px 0; }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="top">
+    <div>
+      <h1>單字卡</h1>
+      <p class="sub">正面輸入中文或英文，儲存前先挑一個翻譯語意；點卡片可翻面看答案</p>
+    </div>
+    <a class="relogin" id="relogin-link" href="#">重新登入</a>
+  </header>
+
+  <div class="form-actions" style="margin-bottom: 24px;">
+    <button class="btn primary" id="new-btn">＋ 新增單字卡</button>
+    <button class="btn" id="bulk-btn">≡ 批次建立</button>
+  </div>
+
+  <div class="panel" id="bulk-panel">
+    <h2>批次建立單字卡</h2>
+    <p class="sub" style="margin-top: -8px; margin-bottom: 14px;">左側貼英文單字、右側貼中文翻譯，每行一個，兩邊依行號逐一配對</p>
+    <div class="bulk-textareas">
+      <div class="field" style="margin-bottom: 0;">
+        <label for="bulk-en">英文單字（每行一個）</label>
+        <textarea id="bulk-en" placeholder="forge&#10;omit&#10;postpone"></textarea>
+      </div>
+      <div class="field" style="margin-bottom: 0;">
+        <label for="bulk-zh">中文翻譯（每行一個，逐行對應左側）</label>
+        <textarea id="bulk-zh" placeholder="鍛造&#10;省略&#10;延期"></textarea>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button type="button" class="btn primary" id="bulk-submit-btn">建立</button>
+      <button type="button" class="btn" id="bulk-cancel-btn">關閉</button>
+    </div>
+
+    <div class="msg" id="bulk-msg"></div>
+    <div class="bulk-results" id="bulk-results"></div>
+  </div>
+
+  <div class="panel" id="form-panel">
+    <h2 id="form-title">新增單字卡</h2>
+    <form id="card-form">
+      <div class="field front-row">
+        <label for="front-input">正面（中文或英文皆可）</label>
+        <input type="text" id="front-input" autocomplete="off" required>
+        <div class="autocomplete-box" id="autocomplete-box"></div>
+        <div class="lang-badge" id="lang-badge"></div>
+      </div>
+
+      <div class="field">
+        <label>背面翻譯</label>
+        <div class="translate-row">
+          <input type="text" id="back-input" placeholder="按「查翻譯」挑選語意，或直接手動輸入" required>
+          <button type="button" class="btn small" id="translate-btn">查翻譯</button>
+        </div>
+        <div class="candidates" id="candidates"></div>
+      </div>
+
+      <div class="field">
+        <label for="note-input">備註（選填）</label>
+        <textarea id="note-input"></textarea>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="btn primary" id="save-btn">儲存</button>
+        <button type="button" class="btn" id="cancel-btn">取消</button>
+      </div>
+
+      <div class="msg" id="form-msg"></div>
+    </form>
+  </div>
+
+  <div id="list-area">
+    <div class="loading">載入中...</div>
+  </div>
+</div>
+
+<script>
+  const AUTH_LOGIN_URL = 'https://auth.linch.uk/login';
+  const CJK_RE = /[㐀-鿿]/;
+
+  const els = {
+    newBtn: document.getElementById('new-btn'),
+    panel: document.getElementById('form-panel'),
+    formTitle: document.getElementById('form-title'),
+    form: document.getElementById('card-form'),
+    front: document.getElementById('front-input'),
+    back: document.getElementById('back-input'),
+    note: document.getElementById('note-input'),
+    langBadge: document.getElementById('lang-badge'),
+    autocompleteBox: document.getElementById('autocomplete-box'),
+    translateBtn: document.getElementById('translate-btn'),
+    candidates: document.getElementById('candidates'),
+    saveBtn: document.getElementById('save-btn'),
+    cancelBtn: document.getElementById('cancel-btn'),
+    formMsg: document.getElementById('form-msg'),
+    listArea: document.getElementById('list-area'),
+    reloginLink: document.getElementById('relogin-link'),
+    bulkBtn: document.getElementById('bulk-btn'),
+    bulkPanel: document.getElementById('bulk-panel'),
+    bulkEn: document.getElementById('bulk-en'),
+    bulkZh: document.getElementById('bulk-zh'),
+    bulkSubmitBtn: document.getElementById('bulk-submit-btn'),
+    bulkCancelBtn: document.getElementById('bulk-cancel-btn'),
+    bulkMsg: document.getElementById('bulk-msg'),
+    bulkResults: document.getElementById('bulk-results'),
+  };
+
+  let editingId = null;
+  let selectedBack = '';
+
+  function safeRedirectURL() {
+    return AUTH_LOGIN_URL + '?redirect=' + encodeURIComponent(window.location.href);
+  }
+  els.reloginLink.href = safeRedirectURL();
+
+  function goToLogin() {
+    window.location.href = safeRedirectURL();
+  }
+
+  async function api(path, options) {
+    const res = await fetch(path, Object.assign({ headers: { 'Content-Type': 'application/json' } }, options));
+    if (res.status === 401) {
+      goToLogin();
+      throw new Error('unauthenticated');
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || `請求失敗 (${res.status})`);
+    }
+    return data;
+  }
+
+  function detectLang(text) {
+    return CJK_RE.test(text) ? 'zh' : 'en';
+  }
+
+  function showFormMsg(text, isError) {
+    els.formMsg.textContent = text;
+    els.formMsg.className = 'msg ' + (isError ? 'error' : 'ok');
+  }
+  function clearFormMsg() {
+    els.formMsg.className = 'msg';
+    els.formMsg.textContent = '';
+  }
+
+  function updateLangBadge() {
+    const front = els.front.value.trim();
+    if (!front) { els.langBadge.textContent = ''; return; }
+    const frontLang = detectLang(front);
+    const backLang = frontLang === 'en' ? '中文' : 'English';
+    els.langBadge.innerHTML = `偵測到：<b>${frontLang === 'en' ? 'English' : '中文'}</b> → ${backLang}`;
+  }
+
+  function openForm(card) {
+    closeBulkPanel();
+    editingId = card ? card.id : null;
+    els.formTitle.textContent = card ? '編輯單字卡' : '新增單字卡';
+    els.front.value = card ? card.front : '';
+    els.back.value = card ? card.back : '';
+    els.note.value = card && card.note ? card.note : '';
+    selectedBack = card ? card.back : '';
+    els.candidates.innerHTML = '';
+    clearFormMsg();
+    updateLangBadge();
+    els.panel.classList.add('open');
+    els.autocompleteBox.classList.remove('open');
+    els.front.focus();
+  }
+
+  function closeForm() {
+    els.panel.classList.remove('open');
+    editingId = null;
+  }
+
+  els.newBtn.addEventListener('click', () => openForm(null));
+  els.cancelBtn.addEventListener('click', closeForm);
+
+  function openBulkPanel() {
+    closeForm();
+    els.bulkResults.innerHTML = '';
+    els.bulkMsg.className = 'msg';
+    els.bulkPanel.classList.add('open');
+    els.bulkEn.focus();
+  }
+  function closeBulkPanel() {
+    els.bulkPanel.classList.remove('open');
+  }
+  els.bulkBtn.addEventListener('click', openBulkPanel);
+  els.bulkCancelBtn.addEventListener('click', closeBulkPanel);
+
+  function splitLines(text) {
+    return text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  }
+
+  function renderBulkRow(en, zh, status, reason) {
+    const icon = status === 'pending' ? '…' : status === 'ok' ? '✓' : '✗';
+    const row = document.createElement('div');
+    row.className = 'bulk-row ' + status;
+    row.innerHTML = `<span class="status">${icon}</span><span>${escapeHtml(en)} → ${escapeHtml(zh)}</span>${reason ? `<span class="reason">${escapeHtml(reason)}</span>` : ''}`;
+    return row;
+  }
+
+  els.bulkSubmitBtn.addEventListener('click', async () => {
+    const enLines = splitLines(els.bulkEn.value);
+    const zhLines = splitLines(els.bulkZh.value);
+
+    els.bulkMsg.className = 'msg';
+    if (enLines.length === 0 || zhLines.length === 0) {
+      els.bulkMsg.textContent = '請在兩側都貼上至少一行';
+      els.bulkMsg.className = 'msg error';
+      return;
+    }
+    if (enLines.length !== zhLines.length) {
+      els.bulkMsg.textContent = `行數不一致：英文 ${enLines.length} 行、中文 ${zhLines.length} 行，請確認逐行對應`;
+      els.bulkMsg.className = 'msg error';
+      return;
+    }
+
+    els.bulkSubmitBtn.disabled = true;
+    els.bulkSubmitBtn.textContent = '建立中...';
+    els.bulkResults.innerHTML = '';
+
+    const rowEls = enLines.map((en, i) => {
+      const el = renderBulkRow(en, zhLines[i], 'pending');
+      els.bulkResults.appendChild(el);
+      return el;
+    });
+
+    let okCount = 0;
+    let failCount = 0;
+    for (let i = 0; i < enLines.length; i++) {
+      const en = enLines[i];
+      const zh = zhLines[i];
+      try {
+        await api('/api/flashcards', {
+          method: 'POST',
+          body: JSON.stringify({ front: en, back: zh, front_lang: 'en', back_lang: 'zh' }),
+        });
+        okCount++;
+        rowEls[i].replaceWith(renderBulkRow(en, zh, 'ok'));
+      } catch (e) {
+        failCount++;
+        rowEls[i].replaceWith(renderBulkRow(en, zh, 'fail', e.message));
+      }
+    }
+
+    els.bulkMsg.textContent = `完成：成功 ${okCount} 筆${failCount ? `，失敗 ${failCount} 筆` : ''}`;
+    els.bulkMsg.className = 'msg ' + (failCount ? 'error' : 'ok');
+    els.bulkSubmitBtn.disabled = false;
+    els.bulkSubmitBtn.textContent = '建立';
+    if (okCount > 0) loadCards();
+  });
+
+  els.front.addEventListener('input', () => {
+    updateLangBadge();
+    scheduleAutocomplete();
+  });
+
+  let autocompleteTimer = null;
+  function scheduleAutocomplete() {
+    clearTimeout(autocompleteTimer);
+    const front = els.front.value.trim();
+    if (detectLang(front) !== 'en' || front.length < 2) {
+      els.autocompleteBox.classList.remove('open');
+      return;
+    }
+    autocompleteTimer = setTimeout(async () => {
+      try {
+        const data = await api('/api/flashcards/autocomplete?q=' + encodeURIComponent(front));
+        renderAutocomplete(data.suggestions || []);
+      } catch (e) {
+        els.autocompleteBox.classList.remove('open');
+      }
+    }, 250);
+  }
+
+  function renderAutocomplete(suggestions) {
+    if (!suggestions.length) {
+      els.autocompleteBox.classList.remove('open');
+      return;
+    }
+    els.autocompleteBox.innerHTML = suggestions.map(w => `<div data-word="${w}">${w}</div>`).join('');
+    els.autocompleteBox.classList.add('open');
+  }
+
+  els.autocompleteBox.addEventListener('click', (e) => {
+    const word = e.target.getAttribute('data-word');
+    if (!word) return;
+    els.front.value = word;
+    updateLangBadge();
+    els.autocompleteBox.classList.remove('open');
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!els.autocompleteBox.contains(e.target) && e.target !== els.front) {
+      els.autocompleteBox.classList.remove('open');
+    }
+  });
+
+  els.translateBtn.addEventListener('click', async () => {
+    const front = els.front.value.trim();
+    if (!front) return;
+    els.translateBtn.disabled = true;
+    els.translateBtn.textContent = '查詢中...';
+    clearFormMsg();
+    try {
+      const data = await api('/api/flashcards/translate', {
+        method: 'POST',
+        body: JSON.stringify({ text: front, source_lang: detectLang(front) }),
+      });
+      renderCandidates(data.candidates || []);
+    } catch (e) {
+      showFormMsg(e.message, true);
+    } finally {
+      els.translateBtn.disabled = false;
+      els.translateBtn.textContent = '查翻譯';
+    }
+  });
+
+  function renderCandidates(candidates) {
+    if (!candidates.length) {
+      els.candidates.innerHTML = '<span class="lang-badge">查無翻譯候選，請手動輸入背面文字</span>';
+      return;
+    }
+    els.candidates.innerHTML = candidates.map((c, i) =>
+      `<span class="candidate${i === 0 ? ' selected' : ''}" data-text="${escapeAttr(c.text)}">${escapeHtml(c.text)}<span class="match">${Math.round(c.match * 100)}%</span></span>`
+    ).join('');
+    if (candidates[0]) {
+      els.back.value = candidates[0].text;
+    }
+  }
+
+  els.candidates.addEventListener('click', (e) => {
+    const el = e.target.closest('.candidate');
+    if (!el) return;
+    els.candidates.querySelectorAll('.candidate').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+    els.back.value = el.getAttribute('data-text');
+  });
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  function escapeAttr(s) { return escapeHtml(s); }
+
+  els.form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const front = els.front.value.trim();
+    const back = els.back.value.trim();
+    if (!front || !back) return;
+
+    const frontLang = detectLang(front);
+    const backLang = frontLang === 'en' ? 'zh' : 'en';
+
+    els.saveBtn.disabled = true;
+    els.saveBtn.textContent = '儲存中...';
+    clearFormMsg();
+    try {
+      const payload = { front, back, front_lang: frontLang, back_lang: backLang, note: els.note.value.trim() };
+      if (editingId) {
+        await api('/api/flashcards/' + editingId, { method: 'PUT', body: JSON.stringify(payload) });
+      } else {
+        await api('/api/flashcards', { method: 'POST', body: JSON.stringify(payload) });
+      }
+      closeForm();
+      loadCards();
+    } catch (e) {
+      showFormMsg(e.message, true);
+    } finally {
+      els.saveBtn.disabled = false;
+      els.saveBtn.textContent = '儲存';
+    }
+  });
+
+  async function deleteCard(id) {
+    if (!confirm('確定要刪除這張單字卡嗎？')) return;
+    try {
+      await api('/api/flashcards/' + id, { method: 'DELETE' });
+      loadCards();
+    } catch (e) {
+      alert(e.message);
+    }
+  }
+
+  function cardHtml(card) {
+    const langTag = card.front_lang === 'en' ? 'EN' : '中';
+    const verbChips = card.is_verb
+      ? `<div class="verb-chips">
+           <span class="verb-chip">${escapeHtml(card.verb_base_form || '')}</span>
+           <span class="verb-chip">${escapeHtml(card.verb_past_form || '')}</span>
+           <span class="verb-chip">${escapeHtml(card.verb_past_participle || '')}</span>
+         </div>`
+      : '';
+    return `
+      <div class="flip-card" data-id="${card.id}">
+        <div class="flip-card-inner">
+          <div class="face front">
+            <div class="face-meta">
+              <span class="lang-tag">${langTag}</span>
+              <div class="card-actions">
+                <button type="button" class="edit" title="編輯">✎</button>
+                <button type="button" class="danger delete" title="刪除">✕</button>
+              </div>
+            </div>
+            <div class="face-text">${escapeHtml(card.front)}</div>
+          </div>
+          <div class="face back">
+            <div class="face-meta"><span class="lang-tag">${langTag === 'EN' ? '中' : 'EN'}</span></div>
+            <div class="face-text">${escapeHtml(card.back)}</div>
+            ${verbChips}
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function renderCards(cards) {
+    if (!cards.length) {
+      els.listArea.innerHTML = '<div class="empty">還沒有單字卡，點上面的「＋ 新增單字卡」開始建立</div>';
+      return;
+    }
+    els.listArea.innerHTML = `<div class="grid">${cards.map(cardHtml).join('')}</div>`;
+
+    els.listArea.querySelectorAll('.flip-card').forEach(el => {
+      const id = el.getAttribute('data-id');
+      const card = cards.find(c => String(c.id) === id);
+      el.querySelector('.flip-card-inner').addEventListener('click', (e) => {
+        if (e.target.closest('.card-actions')) return;
+        el.classList.toggle('flipped');
+      });
+      el.querySelector('.edit').addEventListener('click', (e) => {
+        e.stopPropagation();
+        openForm(card);
+      });
+      el.querySelector('.delete').addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteCard(card.id);
+      });
+    });
+  }
+
+  async function loadCards() {
+    try {
+      const data = await api('/api/flashcards');
+      renderCards(data.flashcards || []);
+    } catch (e) {
+      if (e.message !== 'unauthenticated') {
+        els.listArea.innerHTML = `<div class="empty">${escapeHtml(e.message)}</div>`;
+      }
+    }
+  }
+
+  loadCards();
+</script>
+</body>
+</html>
