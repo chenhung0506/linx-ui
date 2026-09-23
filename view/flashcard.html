@@ -281,6 +281,44 @@
     padding: 60px 0;
   }
   .loading { text-align: center; color: var(--ink-soft); font-size: 13px; padding: 40px 0; }
+
+  /* ---- Familiarity color ---- */
+  .face { border-left: 4px solid var(--card-color, var(--line)); }
+  .btn.small.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  .left-meta { display: flex; align-items: center; gap: 6px; }
+  .color-btn {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 1px solid var(--line);
+    padding: 0;
+  }
+
+  .color-popover {
+    position: fixed;
+    display: none;
+    flex-direction: row;
+    gap: 6px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 6px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+    z-index: 50;
+  }
+  .color-popover.open { display: flex; }
+  @media (max-width: 560px) {
+    .color-popover { flex-direction: column; border-radius: 12px; }
+  }
+  .color-swatch {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    padding: 0;
+  }
+  .color-swatch.current { border-color: var(--ink); }
 </style>
 </head>
 <body>
@@ -293,9 +331,23 @@
     <a class="relogin" id="relogin-link" href="#">重新登入</a>
   </header>
 
-  <div class="form-actions" style="margin-bottom: 24px;">
+  <div class="form-actions" style="margin-bottom: 12px;">
     <button class="btn primary" id="new-btn">＋ 新增單字卡</button>
     <button class="btn" id="bulk-btn">≡ 批次建立</button>
+  </div>
+
+  <div class="form-actions" style="margin-bottom: 24px; flex-wrap: wrap;">
+    <button class="btn small" id="sort-asc-btn" title="依熟悉度：熟 → 不熟，同色順序每次重排">🔵→🔴 依熟悉度排序</button>
+    <button class="btn small" id="sort-desc-btn" title="依熟悉度：不熟 → 熟，同色順序每次重排">🔴→🔵 依熟悉度排序</button>
+    <button class="btn small" id="sort-none-btn" title="回到建立時間排序">原始順序</button>
+  </div>
+
+  <div class="color-popover" id="color-popover">
+    <button type="button" class="color-swatch" data-color="0" title="灰（不常用）"></button>
+    <button type="button" class="color-swatch" data-color="1" title="淺藍（非常熟悉）"></button>
+    <button type="button" class="color-swatch" data-color="2" title="淺綠（熟悉）"></button>
+    <button type="button" class="color-swatch" data-color="3" title="黃（不太熟悉）"></button>
+    <button type="button" class="color-swatch" data-color="4" title="紅（非常不熟悉）"></button>
   </div>
 
   <div class="panel" id="bulk-panel">
@@ -363,6 +415,17 @@
   const AUTH_LOGIN_URL = 'https://auth.linch.uk/login';
   const CJK_RE = /[㐀-鿿]/;
 
+  // Color 0 (gray) is a separate "not commonly used" marker, outside the
+  // 1-4 Blue->Red familiarity gradient — it never participates in the
+  // asc/desc familiarity sort comparison, it's always appended last.
+  const COLORS = [
+    { hex: '#9ca3af', label: '灰（不常用）' },
+    { hex: '#7dd3fc', label: '淺藍（非常熟悉）' },
+    { hex: '#86efac', label: '淺綠（熟悉）' },
+    { hex: '#fde047', label: '黃（不太熟悉）' },
+    { hex: '#f87171', label: '紅（非常不熟悉）' },
+  ];
+
   const els = {
     newBtn: document.getElementById('new-btn'),
     panel: document.getElementById('form-panel'),
@@ -388,10 +451,16 @@
     bulkCancelBtn: document.getElementById('bulk-cancel-btn'),
     bulkMsg: document.getElementById('bulk-msg'),
     bulkResults: document.getElementById('bulk-results'),
+    colorPopover: document.getElementById('color-popover'),
+    sortAscBtn: document.getElementById('sort-asc-btn'),
+    sortDescBtn: document.getElementById('sort-desc-btn'),
+    sortNoneBtn: document.getElementById('sort-none-btn'),
   };
 
   let editingId = null;
   let selectedBack = '';
+  let lastCards = [];
+  let sortMode = 'none'; // 'none' | 'asc' (blue->red) | 'desc' (red->blue)
 
   function safeRedirectURL() {
     return AUTH_LOGIN_URL + '?redirect=' + encodeURIComponent(window.location.href);
@@ -580,7 +649,95 @@
     if (!els.autocompleteBox.contains(e.target) && e.target !== els.front) {
       els.autocompleteBox.classList.remove('open');
     }
+    if (!els.colorPopover.contains(e.target) && !e.target.classList.contains('color-btn')) {
+      els.colorPopover.classList.remove('open');
+    }
   });
+
+  function openColorPopover(btn, cardId, currentColor) {
+    els.colorPopover.dataset.cardId = cardId;
+    els.colorPopover.querySelectorAll('.color-swatch').forEach((el) => {
+      el.classList.toggle('current', Number(el.getAttribute('data-color')) === currentColor);
+    });
+    els.colorPopover.classList.add('open');
+
+    const rect = btn.getBoundingClientRect();
+    const popRect = els.colorPopover.getBoundingClientRect();
+    let top = rect.bottom + 6;
+    let left = rect.left;
+    if (top + popRect.height > window.innerHeight) {
+      top = rect.top - popRect.height - 6;
+    }
+    const maxLeft = window.innerWidth - popRect.width - 8;
+    if (left > maxLeft) left = Math.max(8, maxLeft);
+    els.colorPopover.style.top = top + 'px';
+    els.colorPopover.style.left = left + 'px';
+  }
+
+  els.colorPopover.querySelectorAll('.color-swatch').forEach((el) => {
+    el.style.background = COLORS[Number(el.getAttribute('data-color'))].hex;
+  });
+
+  els.colorPopover.addEventListener('click', async (e) => {
+    const swatch = e.target.closest('.color-swatch');
+    if (!swatch) return;
+    const cardId = els.colorPopover.dataset.cardId;
+    const color = Number(swatch.getAttribute('data-color'));
+    els.colorPopover.classList.remove('open');
+    try {
+      await api('/api/flashcards/' + cardId + '/color', {
+        method: 'PATCH',
+        body: JSON.stringify({ color }),
+      });
+      loadCards();
+    } catch (err) {
+      alert(err.message);
+    }
+  });
+
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  // Sorts by familiarity color (gray always last, regardless of direction)
+  // and reshuffles the order *within* each same-color group every time this
+  // runs — the point is to never let position become a memorization crutch.
+  function sortForDisplay(cards, mode) {
+    if (mode === 'none') return cards.slice();
+    const gray = shuffle(cards.filter(c => c.color === 0));
+    const rest = cards.filter(c => c.color !== 0).slice();
+    const dir = mode === 'asc' ? 1 : -1;
+    rest.sort((a, b) => dir * (a.color - b.color));
+    let start = 0;
+    for (let i = 1; i <= rest.length; i++) {
+      if (i === rest.length || rest[i].color !== rest[start].color) {
+        const group = shuffle(rest.slice(start, i));
+        for (let k = 0; k < group.length; k++) rest[start + k] = group[k];
+        start = i;
+      }
+    }
+    return [...rest, ...gray];
+  }
+
+  function updateSortButtons() {
+    els.sortAscBtn.classList.toggle('active', sortMode === 'asc');
+    els.sortDescBtn.classList.toggle('active', sortMode === 'desc');
+    els.sortNoneBtn.classList.toggle('active', sortMode === 'none');
+  }
+
+  function applySort(mode) {
+    sortMode = mode;
+    updateSortButtons();
+    renderCards(sortForDisplay(lastCards, sortMode));
+  }
+  els.sortAscBtn.addEventListener('click', () => applySort('asc'));
+  els.sortDescBtn.addEventListener('click', () => applySort('desc'));
+  els.sortNoneBtn.addEventListener('click', () => applySort('none'));
+  updateSortButtons();
 
   els.translateBtn.addEventListener('click', async () => {
     const front = els.front.value.trim();
@@ -669,6 +826,8 @@
 
   function cardHtml(card) {
     const langTag = card.front_lang === 'en' ? 'EN' : '中';
+    const color = card.color || 0;
+    const colorHex = (COLORS[color] || COLORS[0]).hex;
     const verbChips = card.is_verb
       ? `<div class="verb-chips">
            <span class="verb-chip">${escapeHtml(card.verb_base_form || '')}</span>
@@ -677,11 +836,14 @@
          </div>`
       : '';
     return `
-      <div class="flip-card" data-id="${card.id}">
+      <div class="flip-card" data-id="${card.id}" data-color="${color}" style="--card-color:${colorHex}">
         <div class="flip-card-inner">
           <div class="face front">
             <div class="face-meta">
-              <span class="lang-tag">${langTag}</span>
+              <div class="left-meta">
+                <span class="lang-tag">${langTag}</span>
+                <button type="button" class="color-btn" style="background:${colorHex}" title="設定熟悉度顏色"></button>
+              </div>
               <div class="card-actions">
                 <button type="button" class="edit" title="編輯">✎</button>
                 <button type="button" class="danger delete" title="刪除">✕</button>
@@ -720,13 +882,18 @@
         e.stopPropagation();
         deleteCard(card.id);
       });
+      el.querySelector('.color-btn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        openColorPopover(e.target, card.id, card.color || 0);
+      });
     });
   }
 
   async function loadCards() {
     try {
       const data = await api('/api/flashcards');
-      renderCards(data.flashcards || []);
+      lastCards = data.flashcards || [];
+      renderCards(sortForDisplay(lastCards, sortMode));
     } catch (e) {
       if (e.message !== 'unauthenticated') {
         els.listArea.innerHTML = `<div class="empty">${escapeHtml(e.message)}</div>`;
