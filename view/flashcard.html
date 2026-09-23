@@ -286,6 +286,11 @@
   .face { border-left: 4px solid var(--card-color, var(--line)); }
   .btn.small.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 
+  .sort-btn { display: inline-flex; align-items: center; gap: 5px; }
+  .sort-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  .sort-arrow { color: var(--ink-soft); font-size: 11px; line-height: 1; }
+  .sort-btn.active .sort-arrow { color: #fff; }
+
   .left-meta { display: flex; align-items: center; gap: 6px; }
   .color-btn {
     width: 16px;
@@ -337,8 +342,18 @@
   </div>
 
   <div class="form-actions" style="margin-bottom: 24px; flex-wrap: wrap;">
-    <button class="btn small" id="sort-asc-btn" title="依熟悉度：熟 → 不熟，同色順序每次重排">🔵→🔴 依熟悉度排序</button>
-    <button class="btn small" id="sort-desc-btn" title="依熟悉度：不熟 → 熟，同色順序每次重排">🔴→🔵 依熟悉度排序</button>
+    <button class="btn small sort-btn" id="sort-asc-btn" title="依熟悉度：熟 → 不熟，同色順序每次重排">
+      <span class="sort-dot" style="background:#7dd3fc"></span>
+      <span class="sort-arrow">→</span>
+      <span class="sort-dot" style="background:#f87171"></span>
+      依熟悉度排序
+    </button>
+    <button class="btn small sort-btn" id="sort-desc-btn" title="依熟悉度：不熟 → 熟，同色順序每次重排">
+      <span class="sort-dot" style="background:#f87171"></span>
+      <span class="sort-arrow">→</span>
+      <span class="sort-dot" style="background:#7dd3fc"></span>
+      依熟悉度排序
+    </button>
     <button class="btn small" id="sort-none-btn" title="回到建立時間排序">原始順序</button>
   </div>
 
