@@ -341,7 +341,7 @@
     <button class="btn" id="bulk-btn">≡ 批次建立</button>
   </div>
 
-  <div class="form-actions" style="margin-bottom: 24px; flex-wrap: wrap;">
+  <div class="form-actions" style="margin-bottom: 12px; flex-wrap: wrap;">
     <button class="btn small sort-btn" id="sort-asc-btn" title="依熟悉度：熟 → 不熟，同色順序每次重排">
       <span class="sort-dot" style="background:#7dd3fc"></span>
       <span class="sort-arrow">→</span>
@@ -355,6 +355,12 @@
       依熟悉度排序
     </button>
     <button class="btn small" id="sort-none-btn" title="回到建立時間排序">原始順序</button>
+  </div>
+
+  <div class="form-actions" style="margin-bottom: 24px; flex-wrap: wrap;">
+    <button class="btn small active" id="filter-all-btn">全部</button>
+    <button class="btn small" id="filter-vocabulary-btn">單字</button>
+    <button class="btn small" id="filter-sentence-btn">句子</button>
   </div>
 
   <div class="color-popover" id="color-popover">
@@ -391,6 +397,14 @@
   <div class="panel" id="form-panel">
     <h2 id="form-title">新增單字卡</h2>
     <form id="card-form">
+      <div class="field">
+        <label>類別</label>
+        <div class="form-actions" style="margin-top: 0;">
+          <button type="button" class="btn small" id="category-vocabulary-btn">單字</button>
+          <button type="button" class="btn small" id="category-sentence-btn">句子</button>
+        </div>
+      </div>
+
       <div class="field front-row">
         <label for="front-input">正面（中文或英文皆可）</label>
         <input type="text" id="front-input" autocomplete="off" required>
@@ -470,12 +484,21 @@
     sortAscBtn: document.getElementById('sort-asc-btn'),
     sortDescBtn: document.getElementById('sort-desc-btn'),
     sortNoneBtn: document.getElementById('sort-none-btn'),
+    categoryVocabBtn: document.getElementById('category-vocabulary-btn'),
+    categorySentenceBtn: document.getElementById('category-sentence-btn'),
+    filterAllBtn: document.getElementById('filter-all-btn'),
+    filterVocabBtn: document.getElementById('filter-vocabulary-btn'),
+    filterSentenceBtn: document.getElementById('filter-sentence-btn'),
   };
+
+  const CATEGORY_LABEL = { vocabulary: '詞', sentence: '句' };
 
   let editingId = null;
   let selectedBack = '';
+  let editingCategory = 'vocabulary';
   let lastCards = [];
   let sortMode = 'none'; // 'none' | 'asc' (blue->red) | 'desc' (red->blue)
+  let categoryFilter = 'all'; // 'all' | 'vocabulary' | 'sentence'
 
   function safeRedirectURL() {
     return AUTH_LOGIN_URL + '?redirect=' + encodeURIComponent(window.location.href);
@@ -520,6 +543,18 @@
     els.langBadge.innerHTML = `偵測到：<b>${frontLang === 'en' ? 'English' : '中文'}</b> → ${backLang}`;
   }
 
+  function updateCategoryButtons() {
+    els.categoryVocabBtn.classList.toggle('active', editingCategory === 'vocabulary');
+    els.categorySentenceBtn.classList.toggle('active', editingCategory === 'sentence');
+  }
+  function setEditingCategory(category) {
+    editingCategory = category;
+    updateCategoryButtons();
+    els.autocompleteBox.classList.remove('open');
+  }
+  els.categoryVocabBtn.addEventListener('click', () => setEditingCategory('vocabulary'));
+  els.categorySentenceBtn.addEventListener('click', () => setEditingCategory('sentence'));
+
   function openForm(card) {
     closeBulkPanel();
     editingId = card ? card.id : null;
@@ -531,6 +566,7 @@
     els.candidates.innerHTML = '';
     clearFormMsg();
     updateLangBadge();
+    setEditingCategory(card ? (card.category || 'vocabulary') : 'vocabulary');
     els.panel.classList.add('open');
     els.autocompleteBox.classList.remove('open');
     els.front.focus();
@@ -629,7 +665,7 @@
   function scheduleAutocomplete() {
     clearTimeout(autocompleteTimer);
     const front = els.front.value.trim();
-    if (detectLang(front) !== 'en' || front.length < 2) {
+    if (editingCategory !== 'vocabulary' || detectLang(front) !== 'en' || front.length < 2) {
       els.autocompleteBox.classList.remove('open');
       return;
     }
@@ -744,15 +780,39 @@
     els.sortNoneBtn.classList.toggle('active', sortMode === 'none');
   }
 
+  function applyCategoryFilter(cards, filter) {
+    if (filter === 'all') return cards;
+    return cards.filter(c => (c.category || 'vocabulary') === filter);
+  }
+
+  function updateFilterButtons() {
+    els.filterAllBtn.classList.toggle('active', categoryFilter === 'all');
+    els.filterVocabBtn.classList.toggle('active', categoryFilter === 'vocabulary');
+    els.filterSentenceBtn.classList.toggle('active', categoryFilter === 'sentence');
+  }
+
+  function rerender() {
+    renderCards(sortForDisplay(applyCategoryFilter(lastCards, categoryFilter), sortMode));
+  }
+
   function applySort(mode) {
     sortMode = mode;
     updateSortButtons();
-    renderCards(sortForDisplay(lastCards, sortMode));
+    rerender();
   }
   els.sortAscBtn.addEventListener('click', () => applySort('asc'));
   els.sortDescBtn.addEventListener('click', () => applySort('desc'));
   els.sortNoneBtn.addEventListener('click', () => applySort('none'));
   updateSortButtons();
+
+  function applyCategoryFilterMode(mode) {
+    categoryFilter = mode;
+    updateFilterButtons();
+    rerender();
+  }
+  els.filterAllBtn.addEventListener('click', () => applyCategoryFilterMode('all'));
+  els.filterVocabBtn.addEventListener('click', () => applyCategoryFilterMode('vocabulary'));
+  els.filterSentenceBtn.addEventListener('click', () => applyCategoryFilterMode('sentence'));
 
   els.translateBtn.addEventListener('click', async () => {
     const front = els.front.value.trim();
@@ -813,7 +873,7 @@
     els.saveBtn.textContent = '儲存中...';
     clearFormMsg();
     try {
-      const payload = { front, back, front_lang: frontLang, back_lang: backLang, note: els.note.value.trim() };
+      const payload = { front, back, front_lang: frontLang, back_lang: backLang, category: editingCategory, note: els.note.value.trim() };
       if (editingId) {
         await api('/api/flashcards/' + editingId, { method: 'PUT', body: JSON.stringify(payload) });
       } else {
@@ -841,6 +901,8 @@
 
   function cardHtml(card) {
     const langTag = card.front_lang === 'en' ? 'EN' : '中';
+    const category = card.category || 'vocabulary';
+    const categoryTag = CATEGORY_LABEL[category] || CATEGORY_LABEL.vocabulary;
     const color = card.color || 0;
     const colorHex = (COLORS[color] || COLORS[0]).hex;
     const verbChips = card.is_verb
@@ -851,12 +913,13 @@
          </div>`
       : '';
     return `
-      <div class="flip-card" data-id="${card.id}" data-color="${color}" style="--card-color:${colorHex}">
+      <div class="flip-card" data-id="${card.id}" data-color="${color}" data-category="${category}" style="--card-color:${colorHex}">
         <div class="flip-card-inner">
           <div class="face front">
             <div class="face-meta">
               <div class="left-meta">
                 <span class="lang-tag">${langTag}</span>
+                <span class="lang-tag" title="${category === 'sentence' ? '句子' : '單字'}">${categoryTag}</span>
                 <button type="button" class="color-btn" style="background:${colorHex}" title="設定熟悉度顏色"></button>
               </div>
               <div class="card-actions">
@@ -908,7 +971,7 @@
     try {
       const data = await api('/api/flashcards');
       lastCards = data.flashcards || [];
-      renderCards(sortForDisplay(lastCards, sortMode));
+      rerender();
     } catch (e) {
       if (e.message !== 'unauthenticated') {
         els.listArea.innerHTML = `<div class="empty">${escapeHtml(e.message)}</div>`;
