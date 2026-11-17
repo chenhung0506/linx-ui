@@ -43,7 +43,11 @@ commit=$(git rev-parse --short HEAD)
 remote="set -e
 cd ~/linx-ui
 git pull --ff-only
-$COMPOSE up -d --build --force-recreate linx-ui
+# The container belongs to the compose project in ~/reverse-proxy/docker (image only, no build), so build the
+# image here under the same tag and recreate the container from there; a compose up in ~/linx-ui would clash on the name.
+docker build -q -t ghcr.io/chenhung0506/linx-ui:latest .
+cd ~/reverse-proxy/docker
+$COMPOSE up -d --force-recreate --pull never linx-ui
 sleep 3
 docker ps --filter name=^linx-ui\$ --format '{{.Names}} {{.Status}}'
 docker image prune -f >/dev/null || true"
